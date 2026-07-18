@@ -6,6 +6,6 @@ export default function robots() {
       userAgent: '*',
       allow: '/',
     },
-    sitemap: 'https://files48.example.com/sitemap.xml',
+    sitemap: 'https://files48.in/sitemap.xml',
   };
 }

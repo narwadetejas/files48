@@ -1,11 +1,5 @@
 import Link from 'next/link';
-
-const toolLinks = [
-  { href: '/tools/image-to-pdf', label: 'Image → PDF', icon: '🖼️' },
-  { href: '/tools/pdf-to-image', label: 'PDF → Image', icon: '📄' },
-  { href: '/tools/resize-image', label: 'Resize Image', icon: '📐' },
-  { href: '/tools/image-converter', label: 'Image Converter', icon: '🔄' },
-];
+import { sidebarTools } from '../lib/tools.js';
 
 export default function Sidebar({ open, onClose }) {
   return (
@@ -15,21 +9,20 @@ export default function Sidebar({ open, onClose }) {
         onClick={onClose}
         aria-hidden={!open}
       />
-      <aside className={`sidebar-panel ${open ? 'open' : ''}`} aria-label="Website features sidebar">
+      <aside className={`sidebar-panel ${open ? 'open' : ''}`} aria-label="Navigation sidebar">
         <div className="sidebar-header">
           <div>
-            <p className="eyebrow">All tools</p>
+            <p className="eyebrow">Menu</p>
             <h2>files48</h2>
           </div>
-          <button type="button" className="icon-button" onClick={onClose} aria-label="Close features menu">
-            ✕
+          <button type="button" className="icon-button" onClick={onClose} aria-label="Close menu">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
           </button>
         </div>
 
         <nav className="sidebar-links">
-          {toolLinks.map((tool) => (
+          {sidebarTools.map((tool) => (
             <Link key={tool.href} href={tool.href} className="sidebar-link" onClick={onClose}>
-              <span aria-hidden="true">{tool.icon}</span>
               <span>{tool.label}</span>
             </Link>
           ))}

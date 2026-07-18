@@ -1,16 +1,16 @@
 import Link from 'next/link';
+import { toolLinks } from '../lib/tools.js';
 
 export default function ToolsLayout({ children }) {
   return (
     <div className="tool-page-shell">
       <div className="container">
-        <div className="mini-nav">
+        <nav className="mini-nav" aria-label="Tool navigation">
           <Link href="/">Home</Link>
-          <Link href="/tools/image-to-pdf">Image → PDF</Link>
-          <Link href="/tools/pdf-to-image">PDF → Image</Link>
-          <Link href="/tools/resize-image">Resize Image</Link>
-          <Link href="/tools/image-converter">Image Converter</Link>
-        </div>
+          {toolLinks.map((tool) => (
+            <Link key={tool.href} href={tool.href}>{tool.label}</Link>
+          ))}
+        </nav>
         {children}
       </div>
     </div>

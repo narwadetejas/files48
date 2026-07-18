@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { PDFDocument } from 'pdf-lib';
+import downloadBlob from '../../lib/downloadBlob';
 
 const PAGE_SIZE_OPTIONS = {
   a4: [595.28, 841.89],
@@ -14,19 +15,13 @@ const buildDownloadName = (name, suffix) => {
   return `${safeStem}_${suffix}`;
 };
 
-const downloadBlob = (blob, fileName) => {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = fileName;
-  link.rel = 'noopener';
-
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-
-  window.setTimeout(() => URL.revokeObjectURL(url), 0);
-};
+const UploadIcon = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+    <polyline points="17 8 12 3 7 8" />
+    <line x1="12" y1="3" x2="12" y2="15" />
+  </svg>
+);
 
 export default function ImageToPdfPage() {
   const inputRef = useRef(null);
@@ -67,52 +62,57 @@ export default function ImageToPdfPage() {
       setOutputName(buildDownloadName(list[0].name, 'files48.pdf'));
     }
     setProgress(0);
-    setMessage(`Loaded ${list.length} image(s). Ready to process.`);
+    setMessage(`Loaded ${list.length} image(s). Ready to convert.`);
   };
 
   const processImages = async () => {
     if (!files.length) return;
 
-    const pdfDoc = await PDFDocument.create();
-    const marginMap = { none: 0, small: 12, large: 24 };
-    const currentMargin = marginMap[margin] ?? 12;
+    try {
+      const pdfDoc = await PDFDocument.create();
+      const marginMap = { none: 0, small: 12, large: 24 };
+      const currentMargin = marginMap[margin] ?? 12;
 
-    for (const [index, file] of files.entries()) {
-      const bytes = await file.arrayBuffer();
-      const image = file.type.includes('png')
-        ? await pdfDoc.embedPng(bytes)
-        : await pdfDoc.embedJpg(bytes);
+      for (const [index, file] of files.entries()) {
+        const bytes = await file.arrayBuffer();
+        const image = file.type.includes('png')
+          ? await pdfDoc.embedPng(bytes)
+          : await pdfDoc.embedJpg(bytes);
 
-      const baseWidth = image.width;
-      const baseHeight = image.height;
-      const normalizedPageWidth = PAGE_SIZE_OPTIONS[pageSize]?.[0] ?? baseWidth;
-      const normalizedPageHeight = PAGE_SIZE_OPTIONS[pageSize]?.[1] ?? baseHeight;
+        const baseWidth = image.width;
+        const baseHeight = image.height;
+        const normalizedPageWidth = PAGE_SIZE_OPTIONS[pageSize]?.[0] ?? baseWidth;
+        const normalizedPageHeight = PAGE_SIZE_OPTIONS[pageSize]?.[1] ?? baseHeight;
 
-      const page = pdfDoc.addPage(
-        orientation === 'landscape'
-          ? [normalizedPageHeight, normalizedPageWidth]
-          : [normalizedPageWidth, normalizedPageHeight],
-      );
+        const page = pdfDoc.addPage(
+          orientation === 'landscape'
+            ? [normalizedPageHeight, normalizedPageWidth]
+            : [normalizedPageWidth, normalizedPageHeight],
+        );
 
-      const drawWidth = pageSize === 'fit' ? baseWidth : normalizedPageWidth - currentMargin * 2;
-      const drawHeight = pageSize === 'fit' ? baseHeight : normalizedPageHeight - currentMargin * 2;
+        const drawWidth = pageSize === 'fit' ? baseWidth : normalizedPageWidth - currentMargin * 2;
+        const drawHeight = pageSize === 'fit' ? baseHeight : normalizedPageHeight - currentMargin * 2;
 
-      page.drawImage(image, {
-        x: currentMargin,
-        y: currentMargin,
-        width: drawWidth,
-        height: drawHeight,
-      });
+        page.drawImage(image, {
+          x: currentMargin,
+          y: currentMargin,
+          width: drawWidth,
+          height: drawHeight,
+        });
 
-      setProgress(Math.round(((index + 1) / files.length) * 100));
+        setProgress(Math.round(((index + 1) / files.length) * 100));
+      }
+
+      setMessage('Rendering PDF in the browser...');
+      const pdfBytes = await pdfDoc.save();
+      const fileName = outputName.endsWith('.pdf') ? outputName : `${outputName}.pdf`;
+      downloadBlob(new Blob([pdfBytes], { type: 'application/pdf' }), fileName);
+      setProgress(100);
+      setMessage('Done! Your PDF download has started.');
+    } catch (error) {
+      setMessage('Error processing images. Some files may be corrupted or unsupported.');
+      setProgress(0);
     }
-
-    setMessage('Rendering pages in the browser...');
-    const pdfBytes = await pdfDoc.save();
-    const fileName = outputName.endsWith('.pdf') ? outputName : `${outputName}.pdf`;
-    downloadBlob(new Blob([pdfBytes], { type: 'application/pdf' }), fileName);
-    setProgress(100);
-    setMessage('Conversion complete. Your file download has started.');
   };
 
   return (
@@ -120,15 +120,33 @@ export default function ImageToPdfPage() {
       <div className="card tool-shell">
         <div>
           <p className="eyebrow">files48</p>
-          <h1>Image → PDF</h1>
-          <p className="muted">This file is processed on your device and is never uploaded to a server.</p>
+          <h1>Image to PDF</h1>
+          <p className="muted">Combine multiple images into a single PDF. Everything happens in your browser.</p>
         </div>
 
         <div className="upload-zone" onClick={() => inputRef.current?.click()}>
           <input ref={inputRef} type="file" accept="image/*" multiple hidden onChange={(e) => handleFiles(e.target.files)} />
-          <strong>Drop files here or click to browse</strong>
-          <div className="muted">Supports JPG, PNG, WebP, and HEIC-ready browser-side conversion paths.</div>
+          <div className="upload-zone-icon"><UploadIcon /></div>
+          <strong>Drop images here or click to browse</strong>
+          <div className="muted">Supports JPG, PNG, and WebP</div>
         </div>
+
+        {visibleFiles.length > 0 && (
+          <div className="preview-gallery">
+            {visibleFiles.map((file, index) => (
+              <div key={`${file.name}-${index}`} className="preview-thumb">
+                <img src={previewUrls[index]} alt={file.name} />
+                <div className="preview-item">
+                  <span>{file.name}</span>
+                  <div>
+                    <button onClick={() => moveFile(index, -1)} type="button" title="Move up">&#8593;</button>
+                    <button onClick={() => moveFile(index, 1)} type="button" title="Move down">&#8595;</button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
         <div className="control-grid">
           <label>
@@ -172,24 +190,10 @@ export default function ImageToPdfPage() {
           <p>{message}</p>
         </div>
 
-        {visibleFiles.length > 0 && (
-          <div className="preview-gallery">
-            {visibleFiles.map((file, index) => (
-              <div key={`${file.name}-${index}`} className="preview-thumb">
-                <img src={previewUrls[index]} alt={file.name} />
-                <div className="preview-item">
-                  <span>{file.name}</span>
-                  <div>
-                    <button onClick={() => moveFile(index, -1)} type="button">↑</button>
-                    <button onClick={() => moveFile(index, 1)} type="button">↓</button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        <button className="primary" onClick={processImages} type="button">Convert to PDF</button>
+        <button className="primary" onClick={processImages} type="button">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /></svg>
+          Convert to PDF
+        </button>
       </div>
     </main>
   );
